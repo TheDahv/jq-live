@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -12,16 +14,30 @@ import (
 )
 
 func main() {
-	var compact = flag.Bool("c", false, "compact output")
-	var debug = flag.String("debug", "", "path to write debug information")
+	var (
+		compact   = flag.Bool("c", false, "compact output")
+		debug     = flag.String("debug", "", "path to write debug information")
+		debugFile *os.File
+		program   string
+		source    io.Reader
+		jsonData  []byte
+	)
+
 	flag.Usage = usage
 	flag.Parse()
 	args := flag.Args()
 
-	var (
-		program string
-		source  io.Reader
-	)
+	if *debug != "" {
+		var err error
+		debugFile, err = os.OpenFile(
+			*debug,
+			os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
+			0666,
+		)
+		if err != nil {
+			log.Fatalf("unable to open debug file: %v", err)
+		}
+	}
 
 	switch len(args) {
 	case 2:
@@ -45,27 +61,22 @@ func main() {
 	}
 
 	processor, err := json.NewShell(json.OptionCompact(*compact))
+	processor.Debug = debugFile
 	if err != nil {
 		log.Fatalf("unable to start up processor: %v", err)
 	}
 
-	out, err := processor.Process(source, program)
-	if err != nil {
-		log.Fatalf("unable to run command: %v", err)
+	if jsonData, err = ioutil.ReadAll(source); err != nil {
+		log.Fatalf("unable to read json source data: %v", err)
 	}
 
-	display := &ui.Termbox{}
-	if *debug != "" {
-		display.Debug, err = os.OpenFile(
-			*debug,
-			os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
-			0666,
-		)
-		if err != nil {
-			log.Fatalf("unable to open debug file: %v", err)
-		}
+	// First parse, letting us know whether this is valid JSON or not
+	out, err := processor.Process(bytes.NewReader(jsonData), program)
+	if err != nil {
+		log.Fatalf("unable to process JSON: %v", err)
 	}
-	fmt.Println("Starting with program:", program)
+
+	display := &ui.Termbox{Debug: debugFile}
 	if err := display.Start(program); err != nil {
 		log.Fatalf("cannot start up display: %v", err)
 	}
@@ -76,18 +87,35 @@ func main() {
 		log.Fatalf("cannot render result: %v", err)
 	}
 
+	// The UI display will emit action events on the channel representing actions
+	// the application can take. Each can possibly be associated with an action to
+	// update the internal state, followed by a render step.
 	for {
 		switch action := <-display.Events(); action {
+		case ui.ActionBackspace:
+			display.UpdateInputBackspace()
 		case ui.ActionExit:
 			display.Quit()
 			os.Exit(0)
 		case ui.ActionInput:
 			display.UpdateInput()
-		case ui.ActionBackspace:
-			display.UpdateInputBackspace()
+		case ui.ActionSubmit:
+			fmt.Fprintf(debugFile, "submitting program: %s\n", display.Input)
+			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
+			if err != nil {
+				// TODO distinguish between normal parse errors and crashable errors
+				if debugFile != nil {
+					fmt.Fprintf(debugFile, "parse error: %v\n", err)
+					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
+				}
+			} else {
+				err := display.RenderResults(out)
+				if err != nil {
+					log.Fatalf("cannot render result: %v", err)
+				}
+			}
 		}
 
-		// TODO: flag dirty?
 		display.RenderInput()
 	}
 }

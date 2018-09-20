@@ -13,12 +13,11 @@ import (
 
 // Termbox draws the jq-live UI via termbox
 type Termbox struct {
-	Debug        io.WriteCloser
-	dirtyInput   bool
-	dirtyResults bool
-	events       chan (Action)
-	input        string
-	newInput     rune
+	Debug      io.WriteCloser
+	Input      string
+	dirtyInput bool
+	events     chan (Action)
+	newInput   rune
 }
 
 // Start initializes the UI and returns a handle to the manager
@@ -28,11 +27,10 @@ func (t *Termbox) Start(initialProgram string) error {
 	}
 	termbox.SetCursor(0, 0)
 
-	t.input = initialProgram
+	t.Input = initialProgram
 
 	// First render
 	t.dirtyInput = true
-	t.dirtyResults = true
 
 	return nil
 }
@@ -40,7 +38,7 @@ func (t *Termbox) Start(initialProgram string) error {
 // UpdateInput appends the new input character to the internal input buffer
 func (t *Termbox) UpdateInput() {
 	if t.newInput != 0 {
-		t.input = fmt.Sprintf("%s%s", t.input, string(t.newInput))
+		t.Input = fmt.Sprintf("%s%s", t.Input, string(t.newInput))
 		t.newInput = 0
 		t.dirtyInput = true
 	}
@@ -48,11 +46,11 @@ func (t *Termbox) UpdateInput() {
 
 // UpdateInputBackspace removes the last character from the input
 func (t *Termbox) UpdateInputBackspace() {
-	if len(t.input) == 0 {
+	if len(t.Input) == 0 {
 		return
 	}
 
-	t.input = t.input[0 : len(t.input)-1]
+	t.Input = t.Input[0 : len(t.Input)-1]
 	t.dirtyInput = true
 }
 
@@ -64,6 +62,7 @@ const (
 	ActionBackspace Action = iota
 	ActionExit
 	ActionInput
+	ActionSubmit // TODO replace with live editing
 )
 
 // Events returns a channel of Actions that are sent through the application
@@ -77,8 +76,13 @@ func (t *Termbox) Events() chan (Action) {
 				switch key := ev.Key; key {
 				case termbox.KeyEsc, termbox.KeyCtrlC, termbox.KeyCtrlD:
 					t.events <- ActionExit
+				case termbox.KeyEnter:
+					t.events <- ActionSubmit
 				case termbox.KeyBackspace, termbox.KeyBackspace2:
 					t.events <- ActionBackspace
+				case termbox.KeySpace:
+					t.newInput = ' '
+					t.events <- ActionInput
 				default:
 					if ev.Ch != 0 {
 						t.newInput = ev.Ch
@@ -94,16 +98,9 @@ func (t *Termbox) Events() chan (Action) {
 
 // RenderInput updates the input display to match the internal buffer
 func (t *Termbox) RenderInput() error {
-	if !t.dirtyInput {
-		return nil
-	}
-	defer func() {
-		t.dirtyInput = false
-	}()
+	t.debugf("input: %s\n", t.Input)
 
-	t.debugf("input: %s\n", t.input)
-
-	scanner := bufio.NewScanner(strings.NewReader(t.input))
+	scanner := bufio.NewScanner(strings.NewReader(t.Input))
 	scanner.Split(bufio.ScanRunes)
 
 	var x int
@@ -116,11 +113,11 @@ func (t *Termbox) RenderInput() error {
 
 	// Clear rest of the input on the row
 	w, _ := termbox.Size()
-	for x := len(t.input); x < w; x++ {
+	for x := len(t.Input); x < w; x++ {
 		termbox.SetCell(x, 0, 0, termbox.ColorDefault, termbox.ColorDefault)
 	}
 
-	termbox.SetCursor(len(t.input), 0)
+	termbox.SetCursor(len(t.Input), 0)
 	err := scanner.Err()
 	if err == io.EOF {
 		err = nil
@@ -132,13 +129,6 @@ func (t *Termbox) RenderInput() error {
 
 // RenderResults renders the results of jq output to the screen
 func (t *Termbox) RenderResults(data io.Reader) error {
-	if !t.dirtyResults {
-		return nil
-	}
-	defer func() {
-		t.dirtyResults = false
-	}()
-
 	var (
 		xOffset   int
 		yPos      = 1 // Offset for input row
@@ -212,6 +202,6 @@ func (t *Termbox) Quit() {
 // debugf writes to the debug path, if it exists
 func (t *Termbox) debugf(format string, args ...interface{}) {
 	if t.Debug != nil {
-		fmt.Fprintf(t.Debug, format, args...)
+		fmt.Fprintf(t.Debug, "[UI] "+format, args...)
 	}
 }

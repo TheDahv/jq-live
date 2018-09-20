@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os/exec"
 )
 
 // Shell makes calls to the jq binary installed in the current environment to
 // implement the Processor interface.
 type Shell struct {
+	Debug   io.Writer
 	compact bool
 }
 
@@ -35,13 +37,22 @@ func (sh *Shell) Process(source io.Reader, program string) (io.Reader, error) {
 		args = append(args, "-c")
 	}
 
+	sh.debugf("processing program: %s\n", program)
 	args = append(args, program)
 	cmd := exec.Command("jq", args...)
-	cmd.Stdin = source
-	out, err := cmd.Output()
+
+	src, _ := ioutil.ReadAll(source)
+	sh.debugf("file input:\n")
+	sh.debugf(string(src))
+
+	cmd.Stdin = bytes.NewReader(src)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
+		sh.debugf("processing error: %v\n", err)
 		return nil, fmt.Errorf("cannot read jq output: %v", err)
 	}
+	sh.debugf("program result:\n")
+	sh.debugf(string(out))
 
 	return bytes.NewReader(out), nil
 }
@@ -55,5 +66,11 @@ func OptionCompact(compact bool) ShellOption {
 	return func(sh *Shell) (*Shell, error) {
 		sh.compact = compact
 		return sh, nil
+	}
+}
+
+func (sh *Shell) debugf(format string, args ...interface{}) {
+	if sh.Debug != nil {
+		fmt.Fprintf(sh.Debug, "[Shell] "+format, args...)
 	}
 }
