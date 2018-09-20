@@ -13,6 +13,7 @@ import (
 type Shell struct {
 	Debug   io.Writer
 	compact bool
+	raw     bool
 }
 
 // NewShell returns a new shell Processor with all configurations applied
@@ -35,6 +36,9 @@ func (sh *Shell) Process(source io.Reader, program string) (io.Reader, error) {
 	var args []string
 	if sh.compact {
 		args = append(args, "-c")
+	}
+	if sh.raw {
+		args = append(args, "-r")
 	}
 
 	sh.debugf("processing program: %s\n", program)
@@ -67,6 +71,26 @@ func OptionCompact(compact bool) ShellOption {
 		sh.compact = compact
 		return sh, nil
 	}
+}
+
+// OptionRaw tells jq to return compact output
+func OptionRaw(raw bool) ShellOption {
+	return func(sh *Shell) (*Shell, error) {
+		sh.raw = raw
+		return sh, nil
+	}
+}
+
+// ToggleCompact flips the internal compact option
+func (sh *Shell) ToggleCompact() {
+	sh.debugf("setting compact to %b\n", !sh.compact)
+	sh.compact = !sh.compact
+}
+
+// ToggleRaw flips the internal raw option
+func (sh *Shell) ToggleRaw() {
+	sh.debugf("setting compact to %b\n", !sh.compact)
+	sh.compact = !sh.compact
 }
 
 func (sh *Shell) debugf(format string, args ...interface{}) {

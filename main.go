@@ -17,6 +17,7 @@ func main() {
 	var (
 		compact   = flag.Bool("c", false, "compact output")
 		debug     = flag.String("debug", "", "path to write debug information")
+		raw       = flag.Bool("r", false, "raw output")
 		debugFile *os.File
 		program   string
 		source    io.Reader
@@ -60,7 +61,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	processor, err := json.NewShell(json.OptionCompact(*compact))
+	processor, err := json.NewShell(
+		json.OptionCompact(*compact),
+		json.OptionRaw(*raw),
+	)
 	processor.Debug = debugFile
 	if err != nil {
 		log.Fatalf("unable to start up processor: %v", err)
@@ -94,11 +98,68 @@ func main() {
 		switch action := <-display.Events(); action {
 		case ui.ActionBackspace:
 			display.UpdateInputBackspace()
+
 		case ui.ActionExit:
 			display.Quit()
 			os.Exit(0)
+
 		case ui.ActionInput:
 			display.UpdateInput()
+
+		case ui.ActionPrint:
+			display.Quit()
+			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
+			if err != nil {
+				// TODO distinguish between normal parse errors and crashable errors
+				if debugFile != nil {
+					fmt.Fprintf(debugFile, "parse error: %v\n", err)
+					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
+				}
+				os.Exit(1)
+			} else {
+				io.Copy(os.Stdout, out)
+				os.Exit(0)
+			}
+
+		case ui.ActionSave:
+			// TODO
+			// - Prompt for file input
+			// - Accept prompt, or cancel save on empty input
+			// - Write output to file and quit
+
+		case ui.ActionToggleCompact:
+			processor.ToggleCompact()
+			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
+			if err != nil {
+				// TODO distinguish between normal parse errors and crashable errors
+				if debugFile != nil {
+					fmt.Fprintf(debugFile, "parse error: %v\n", err)
+					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
+				}
+			} else {
+				err := display.RenderResults(out)
+				if err != nil {
+					log.Fatalf("cannot render result: %v", err)
+				}
+			}
+
+		case ui.ActionToggleRaw:
+			// TODO need some kind of modal indicator in the UI
+			processor.ToggleRaw()
+			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
+			if err != nil {
+				// TODO distinguish between normal parse errors and crashable errors
+				if debugFile != nil {
+					fmt.Fprintf(debugFile, "parse error: %v\n", err)
+					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
+				}
+			} else {
+				err := display.RenderResults(out)
+				if err != nil {
+					log.Fatalf("cannot render result: %v", err)
+				}
+			}
+
 		case ui.ActionSubmit:
 			fmt.Fprintf(debugFile, "submitting program: %s\n", display.Input)
 			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)

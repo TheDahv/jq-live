@@ -62,7 +62,11 @@ const (
 	ActionBackspace Action = iota
 	ActionExit
 	ActionInput
+	ActionPrint
+	ActionSave
 	ActionSubmit // TODO replace with live editing
+	ActionToggleCompact
+	ActionToggleRaw
 )
 
 // Events returns a channel of Actions that are sent through the application
@@ -76,6 +80,14 @@ func (t *Termbox) Events() chan (Action) {
 				switch key := ev.Key; key {
 				case termbox.KeyEsc, termbox.KeyCtrlC, termbox.KeyCtrlD:
 					t.events <- ActionExit
+				case termbox.KeyCtrlE:
+					t.events <- ActionToggleCompact
+				case termbox.KeyCtrlP:
+					t.events <- ActionPrint
+				case termbox.KeyCtrlR:
+					t.events <- ActionToggleRaw
+				case termbox.KeyCtrlS:
+					t.events <- ActionSave
 				case termbox.KeyEnter:
 					t.events <- ActionSubmit
 				case termbox.KeyBackspace, termbox.KeyBackspace2:
@@ -84,6 +96,7 @@ func (t *Termbox) Events() chan (Action) {
 					t.newInput = ' '
 					t.events <- ActionInput
 				default:
+					t.debugf("key pressed: %d. Mod: %v\n", ev.Ch, ev.Mod)
 					if ev.Ch != 0 {
 						t.newInput = ev.Ch
 						t.events <- ActionInput
