@@ -121,18 +121,8 @@ func main() {
 
 		case ui.ActionPrint:
 			display.Quit()
-			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
-			if err != nil {
-				// TODO distinguish between normal parse errors and crashable errors
-				if debugFile != nil {
-					fmt.Fprintf(debugFile, "parse error: %v\n", err)
-					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
-				}
-				os.Exit(1)
-			} else {
-				io.Copy(os.Stdout, out)
-				os.Exit(0)
-			}
+			processAndPrintTo(processor, display.Input, os.Stdout, jsonData, debugFile)
+			os.Exit(0)
 
 		case ui.ActionSaveInput:
 			display.UpdateSaveInput()
@@ -160,69 +150,21 @@ func main() {
 			if err != nil {
 				log.Fatalf("could not open save file: %v", err)
 			}
-			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
-			if err != nil {
-				// TODO distinguish between normal parse errors and crashable errors
-				if debugFile != nil {
-					fmt.Fprintf(debugFile, "parse error: %v\n", err)
-					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
-				}
-			} else {
-				_, err := io.Copy(f, out)
-				if err != nil {
-					log.Fatalf("could not write results to file: %v", err)
-				}
-				os.Exit(0)
-			}
+			processAndPrintTo(processor, display.Input, f, jsonData, debugFile)
+			os.Exit(0)
 
 		case ui.ActionToggleCompact:
 			processor.ToggleCompact()
-			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
-			if err != nil {
-				// TODO distinguish between normal parse errors and crashable errors
-				if debugFile != nil {
-					fmt.Fprintf(debugFile, "parse error: %v\n", err)
-					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
-				}
-			} else {
-				err := display.RenderResults(out)
-				if err != nil {
-					log.Fatalf("cannot render result: %v", err)
-				}
-			}
+			processAndPrint(processor, display, jsonData, debugFile)
 
 		case ui.ActionToggleRaw:
 			// TODO need some kind of UI indicator to indicate active options
 			processor.ToggleRaw()
-			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
-			if err != nil {
-				// TODO distinguish between normal parse errors and crashable errors
-				if debugFile != nil {
-					fmt.Fprintf(debugFile, "parse error: %v\n", err)
-					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
-				}
-			} else {
-				err := display.RenderResults(out)
-				if err != nil {
-					log.Fatalf("cannot render result: %v", err)
-				}
-			}
+			processAndPrint(processor, display, jsonData, debugFile)
 
 		case ui.ActionSubmit:
 			fmt.Fprintf(debugFile, "submitting program: %s\n", display.Input)
-			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
-			if err != nil {
-				// TODO distinguish between normal parse errors and crashable errors
-				if debugFile != nil {
-					fmt.Fprintf(debugFile, "parse error: %v\n", err)
-					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
-				}
-			} else {
-				err := display.RenderResults(out)
-				if err != nil {
-					log.Fatalf("cannot render result: %v", err)
-				}
-			}
+			processAndPrint(processor, display, jsonData, debugFile)
 		}
 	}
 }
@@ -235,6 +177,41 @@ func inputOnStdin(stdin *os.File) bool {
 		return true
 	}
 	return (stat.Mode() & os.ModeNamedPipe) != 0
+}
+
+func processAndPrint(p json.Processor, disp *ui.Termbox, data []byte, debug *os.File) error {
+	out, err := p.Process(bytes.NewReader(data), disp.Input)
+	if err != nil {
+		// TODO distinguish between normal parse errors and crashable errors
+		if debug != nil {
+			fmt.Fprintf(debug, "parse error: %v\n", err)
+			fmt.Fprintf(debug, "program: %s\n", disp.Input)
+		}
+	} else {
+		err := disp.RenderResults(out)
+		if err != nil {
+			log.Fatalf("cannot render result: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func processAndPrintTo(p json.Processor, program string, w io.Writer, data []byte, debug *os.File) error {
+	out, err := p.Process(bytes.NewReader(data), program)
+	if err != nil {
+		// TODO distinguish between normal parse errors and crashable errors
+		if debug != nil {
+			fmt.Fprintf(debug, "parse error: %v\n", err)
+			fmt.Fprintf(debug, "program: %s\n", program)
+		}
+	} else {
+		if _, err := io.Copy(w, out); err != nil {
+			log.Fatalf("cannot print result: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func usage() {
