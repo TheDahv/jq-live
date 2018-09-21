@@ -11,14 +11,22 @@ import (
 	"github.com/nsf/termbox-go"
 )
 
+// TODO move exported fields behind methods so we can wrap in an interface. It
+// will make porting to other libraries easier:
+// https://github.com/gdamore/tcell
+
 // Termbox draws the jq-live UI via termbox
 type Termbox struct {
-	Debug      io.WriteCloser
-	Input      string
-	dirtyInput bool
-	events     chan (Action)
-	newInput   rune
+	Debug         io.WriteCloser
+	Input         string
+	SaveInputMode bool
+	SavePath      string
+	dirtyInput    bool
+	events        chan (Action)
+	newInput      rune
 }
+
+const filePrompt = "save to: "
 
 // Start initializes the UI and returns a handle to the manager
 func (t *Termbox) Start(initialProgram string) error {
@@ -54,17 +62,39 @@ func (t *Termbox) UpdateInputBackspace() {
 	t.dirtyInput = true
 }
 
+// UpdateSaveInput appends the new input character to the internal input buffer
+func (t *Termbox) UpdateSaveInput() {
+	if t.newInput != 0 {
+		t.SavePath = fmt.Sprintf("%s%s", t.SavePath, string(t.newInput))
+		t.newInput = 0
+		t.dirtyInput = true
+	}
+}
+
+// UpdateSaveInputBackspace removes the last character from the input
+func (t *Termbox) UpdateSaveInputBackspace() {
+	if len(t.SavePath) == 0 {
+		return
+	}
+
+	t.SavePath = t.SavePath[0 : len(t.SavePath)-1]
+	t.dirtyInput = true
+}
+
 // Action defines the events and interactions possible in the application
 type Action uint8
 
 // The following are the known Actions from the app to handle
 const (
-	ActionBackspace Action = iota
-	ActionExit
+	ActionExit Action = iota
 	ActionInput
+	ActionInputBackspace
 	ActionPrint
-	ActionSave
-	ActionSubmit // TODO replace with live editing
+	ActionSaveInput
+	ActionSavePrompt
+	ActionSavePromptBackspace
+	ActionSaveSubmit
+	ActionSubmit
 	ActionToggleCompact
 	ActionToggleRaw
 )
@@ -87,11 +117,19 @@ func (t *Termbox) Events() chan (Action) {
 				case termbox.KeyCtrlR:
 					t.events <- ActionToggleRaw
 				case termbox.KeyCtrlS:
-					t.events <- ActionSave
+					t.events <- ActionSavePrompt
 				case termbox.KeyEnter:
-					t.events <- ActionSubmit
+					if t.SaveInputMode {
+						t.events <- ActionSaveSubmit
+					} else {
+						t.events <- ActionSubmit
+					}
 				case termbox.KeyBackspace, termbox.KeyBackspace2:
-					t.events <- ActionBackspace
+					if t.SaveInputMode {
+						t.events <- ActionSavePromptBackspace
+					} else {
+						t.events <- ActionInputBackspace
+					}
 				case termbox.KeySpace:
 					t.newInput = ' '
 					t.events <- ActionInput
@@ -99,7 +137,11 @@ func (t *Termbox) Events() chan (Action) {
 					t.debugf("key pressed: %d. Mod: %v\n", ev.Ch, ev.Mod)
 					if ev.Ch != 0 {
 						t.newInput = ev.Ch
-						t.events <- ActionInput
+						if t.SaveInputMode {
+							t.events <- ActionSaveInput
+						} else {
+							t.events <- ActionInput
+						}
 					}
 				}
 			}
@@ -138,6 +180,41 @@ func (t *Termbox) RenderInput() error {
 
 	termbox.Flush()
 	return err
+}
+
+// RenderFilePrompt switches the UI to the file input
+func (t *Termbox) RenderFilePrompt() error {
+	t.debugf("renderfileprompt: %v\n", t.SaveInputMode)
+	if !t.SaveInputMode {
+		return nil
+	}
+
+	// Clear input row
+	w, _ := termbox.Size()
+	for x := 0; x < w; x++ {
+		termbox.SetCell(x, 0, ' ', termbox.ColorDefault, termbox.ColorDefault)
+	}
+
+	t.debugf("rendering prompt: '%s'\n", filePrompt+t.SavePath)
+	prompt := filePrompt + t.SavePath
+	scanner := bufio.NewScanner(strings.NewReader(prompt))
+	scanner.Split(bufio.ScanRunes)
+
+	var x int
+	for scanner.Scan() {
+		r, w := utf8.DecodeRune(scanner.Bytes())
+		t.debugf("printing %s\n", string(r))
+		termbox.SetCell(x, 0, r, termbox.ColorDefault, termbox.ColorDefault)
+		x += w
+	}
+	termbox.SetCursor(len(prompt), 0)
+
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return fmt.Errorf("could not print save prompt: %v", err)
+	}
+
+	termbox.Flush()
+	return nil
 }
 
 // RenderResults renders the results of jq output to the screen

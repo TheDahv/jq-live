@@ -24,6 +24,11 @@ func main() {
 		jsonData  []byte
 	)
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("unable to determine current directory: %v", err)
+	}
+
 	flag.Usage = usage
 	flag.Parse()
 	args := flag.Args()
@@ -96,8 +101,9 @@ func main() {
 	// update the internal state, followed by a render step.
 	for {
 		switch action := <-display.Events(); action {
-		case ui.ActionBackspace:
+		case ui.ActionInputBackspace:
 			display.UpdateInputBackspace()
+			display.RenderInput()
 
 		case ui.ActionExit:
 			display.Quit()
@@ -105,6 +111,7 @@ func main() {
 
 		case ui.ActionInput:
 			display.UpdateInput()
+			display.RenderInput()
 
 		case ui.ActionPrint:
 			display.Quit()
@@ -121,11 +128,46 @@ func main() {
 				os.Exit(0)
 			}
 
-		case ui.ActionSave:
-			// TODO
-			// - Prompt for file input
-			// - Accept prompt, or cancel save on empty input
-			// - Write output to file and quit
+		case ui.ActionSaveInput:
+			display.UpdateSaveInput()
+			display.RenderFilePrompt()
+
+		case ui.ActionSavePrompt:
+			// TODO Support cancellation in save prompt
+			display.SaveInputMode = true
+			if err := display.RenderFilePrompt(); err != nil {
+				log.Fatalf("unable to open save form: %v", err)
+			}
+
+		case ui.ActionSavePromptBackspace:
+			display.UpdateSaveInputBackspace()
+			display.RenderFilePrompt()
+
+		case ui.ActionSaveSubmit:
+			display.Quit()
+			// TODO handle "mkdir -p" style directory create
+			f, err := os.OpenFile(
+				fmt.Sprintf("%s/%s", cwd, display.SavePath),
+				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+				0666,
+			)
+			if err != nil {
+				log.Fatalf("could not open save file: %v", err)
+			}
+			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
+			if err != nil {
+				// TODO distinguish between normal parse errors and crashable errors
+				if debugFile != nil {
+					fmt.Fprintf(debugFile, "parse error: %v\n", err)
+					fmt.Fprintf(debugFile, "program: %s\n", display.Input)
+				}
+			} else {
+				_, err := io.Copy(f, out)
+				if err != nil {
+					log.Fatalf("could not write results to file: %v", err)
+				}
+				os.Exit(0)
+			}
 
 		case ui.ActionToggleCompact:
 			processor.ToggleCompact()
@@ -144,7 +186,7 @@ func main() {
 			}
 
 		case ui.ActionToggleRaw:
-			// TODO need some kind of modal indicator in the UI
+			// TODO need some kind of UI indicator to indicate active options
 			processor.ToggleRaw()
 			out, err := processor.Process(bytes.NewReader(jsonData), display.Input)
 			if err != nil {
@@ -176,8 +218,6 @@ func main() {
 				}
 			}
 		}
-
-		display.RenderInput()
 	}
 }
 
