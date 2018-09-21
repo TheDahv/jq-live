@@ -1,3 +1,21 @@
+// Package ui handles user input, JSON processing output, and sending
+// interactions and commands to the JSON processor.
+//
+// The basic layout of the UI should include:
+// - One-row input for entering jq programs
+// - The rest of the container for displaying JSON processor output
+//
+// The data flow should flow through the following loop:
+// - Initial state
+// - Actions representing changes or events in the program
+// - Functions that listen for a given action and call methods on a UI
+//	 implementation to update the state
+// - Render the new state into application UI
+//
+// This should seem familiar to web programmers familiar with the Flux/Redux
+// flow. However, since Go doesn't have union types that carry data, and since
+// we want tighter control over memory, we use internal fields and buffers to
+// manage interim states and reuse memory.
 package ui
 
 import (
@@ -11,8 +29,8 @@ import (
 	"github.com/nsf/termbox-go"
 )
 
-// TODO move exported fields behind methods so we can wrap in an interface. It
-// will make porting to other libraries easier:
+// TODO move exported fields behind methods so we can wrap in an interface.
+// It will make porting to other libraries easier:
 // https://github.com/gdamore/tcell
 
 // Termbox draws the jq-live UI via termbox

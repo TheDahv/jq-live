@@ -243,4 +243,10 @@ func usage() {
 Usage: jq-live <program> [path]
 `)
 	flag.PrintDefaults()
+
+	fmt.Fprintf(os.Stderr, "\nkeyboard shortcuts:\n\n")
+	fmt.Fprintf(os.Stderr, "  Ctrl-E: Toggle expanded or compact results\n")
+	fmt.Fprintf(os.Stderr, "  Ctrl-R: Toggle raw results\n")
+	fmt.Fprintf(os.Stderr, "  Ctrl-P: Print current results to stdout and quit\n")
+	fmt.Fprintf(os.Stderr, "  Ctrl-S: Save current results to specified file and quit\n")
 }

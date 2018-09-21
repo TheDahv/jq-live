@@ -16,7 +16,7 @@ type Shell struct {
 	raw     bool
 }
 
-// NewShell returns a new shell Processor with all configurations applied
+// NewShell returns a new shell Processor with all configurations applied.
 func NewShell(opts ...ShellOption) (*Shell, error) {
 	sh := &Shell{}
 

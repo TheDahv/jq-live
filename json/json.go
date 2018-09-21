@@ -1,3 +1,6 @@
+// Package json manages applying a program of selectors, processors, and
+// extractors as defined by the jq program against input JSON and producing the
+// result.
 package json
 
 import "io"
