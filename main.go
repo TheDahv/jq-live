@@ -19,7 +19,6 @@ func main() {
 		debug     = flag.String("debug", "", "path to write debug information")
 		raw       = flag.Bool("r", false, "raw output")
 		debugFile *os.File
-		program   string
 		source    io.Reader
 		jsonData  []byte
 	)
@@ -45,25 +44,32 @@ func main() {
 		}
 	}
 
-	switch len(args) {
-	case 2:
-		// program + file path
-		var err error
-		program = args[0]
-		if source, err = os.Open(args[1]); err != nil {
-			log.Fatalf("unable to open input: %v", err)
+	var program = "."
+	if inputOnStdin(os.Stdin) {
+		source = os.Stdin
+		if len(args) > 0 {
+			program = args[0]
 		}
-	case 1:
-		// just the program
-		program = args[0]
-		source = os.Stdin
-	case 0:
-		// no program; assume object print as a default program and read from stdin
-		program = "."
-		source = os.Stdin
-	default:
-		flag.Usage()
-		os.Exit(1)
+	} else {
+		switch len(args) {
+		case 2:
+			// program + file path
+			var err error
+			program = args[0]
+			if source, err = os.Open(args[1]); err != nil {
+				log.Fatalf("unable to open input: %v", err)
+			}
+
+		case 1:
+			// No program, just the file path
+			if source, err = os.Open(args[0]); err != nil {
+				log.Fatalf("unable to open input: %v", err)
+			}
+
+		default:
+			flag.Usage()
+			os.Exit(1)
+		}
 	}
 
 	processor, err := json.NewShell(
@@ -219,6 +225,16 @@ func main() {
 			}
 		}
 	}
+}
+
+func inputOnStdin(stdin *os.File) bool {
+	stat, err := stdin.Stat()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to stat stdin: %v\n", err)
+		// We'll assume reading from file, but we'll probably crash somewhere later.
+		return true
+	}
+	return (stat.Mode() & os.ModeNamedPipe) != 0
 }
 
 func usage() {
