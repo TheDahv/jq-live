@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/nsf/termbox-go"
@@ -42,6 +43,7 @@ type Termbox struct {
 	dirtyInput    bool
 	events        chan (Action)
 	newInput      rune
+	flushLock     sync.Mutex
 }
 
 const filePrompt = "save to: "
@@ -122,6 +124,18 @@ func (t *Termbox) Events() chan (Action) {
 	t.events = make(chan (Action))
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Termbox will occasionally crash reading new input into its event
+				// buffers. No idea why, and I don't want to sync time into finding it.
+				// Log and continue listening for events.
+				//
+				// https://github.com/nsf/termbox-go/issues/166
+				// https://github.com/nsf/termbox-go/issues/169
+				t.debugf("termbox events buffer failed: %v\n", r)
+			}
+		}()
+
 		for {
 			switch ev := termbox.PollEvent(); ev.Type {
 			case termbox.EventKey:
@@ -196,8 +210,10 @@ func (t *Termbox) RenderInput() error {
 		err = nil
 	}
 
-	termbox.Flush()
-	return err
+	if err != nil {
+		return fmt.Errorf("could not process data for printing: %v", err)
+	}
+	return t.Flush()
 }
 
 // RenderFilePrompt switches the UI to the file input
@@ -231,8 +247,7 @@ func (t *Termbox) RenderFilePrompt() error {
 		return fmt.Errorf("could not print save prompt: %v", err)
 	}
 
-	termbox.Flush()
-	return nil
+	return t.Flush()
 }
 
 // RenderResults renders the results of jq output to the screen
@@ -295,8 +310,19 @@ func (t *Termbox) RenderResults(data io.Reader) error {
 		err = nil
 	}
 
-	err = termbox.Flush()
-	return err
+	return t.Flush()
+}
+
+// Flush prints any unprinted UI changes to the screen
+//
+// termbox-go Flush() is not goroutine safe, so we're protecting access if
+// updates come in very quickly.
+// https://github.com/nsf/termbox-go/issues/113
+func (t *Termbox) Flush() error {
+	t.flushLock.Lock()
+	defer t.flushLock.Unlock()
+
+	return termbox.Flush()
 }
 
 // Quit ends the program, gives the display back to the terminal, and performs
