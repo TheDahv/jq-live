@@ -17,20 +17,21 @@ require (
 	github.com/klauspost/asmfmt v0.0.0-20171230121622-022c51c61cbd // indirect
 	github.com/koron/iferr v0.0.0-20180615142939-bb332a3b1d91 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
+	github.com/mattn/go-runewidth v0.0.3
 	github.com/mdempsky/gocode v0.0.0-20180727200127-00e7f5ac290a // indirect
 	github.com/nicksnyder/go-i18n v1.10.0 // indirect
 	github.com/nsf/termbox-go v0.0.0-20180819125858-b66b20ab708e
 	github.com/pelletier/go-toml v1.2.0 // indirect
 	github.com/peterh/liner v1.1.0 // indirect
 	github.com/rogpeppe/godef v1.0.0 // indirect
-	github.com/savaki/jq v0.0.0-20161209013833-0e6baecebbf8
+	github.com/savaki/jq v0.0.0-20161209013833-0e6baecebbf8 // indirect
 	github.com/sirupsen/logrus v1.0.6 // indirect
 	github.com/spf13/cobra v0.0.3 // indirect
 	github.com/spf13/pflag v1.0.2 // indirect
 	github.com/zmb3/gogetdoc v0.0.0-20180522031303-10095872a7c5 // indirect
 	golang.org/x/arch v0.0.0-20180516175055-5de9028c2478 // indirect
 	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b // indirect
-	golang.org/x/exp v0.0.0-20180907224206-e88728d35e99
+	golang.org/x/exp v0.0.0-20180907224206-e88728d35e99 // indirect
 	golang.org/x/lint v0.0.0-20180702182130-06c8688daad7 // indirect
 	golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e // indirect
 	golang.org/x/tools v0.0.0-20180911133044-677d2ff680c1 // indirect
