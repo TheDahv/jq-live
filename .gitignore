@@ -1,2 +1,4 @@
 jq-live
 vendor
+.vscode
+debug.out

@@ -42,7 +42,7 @@ Here's some `jq-live` in action:
 - Binary downloads: _Not available yet_
 - Package managers: _Not available yet_
 - Via `go get`
-  - Run `go get -u gitlab.com/thedahv/jq-live`
+  - Run `go get -u github.com/TheDahv/jq-live`
 
 ## Possible Future Features or Changes
 
@@ -81,7 +81,7 @@ Code TODOs:
 
 To get started working on `jq-live`, download the project to your computer with:
 
-    go get -u gitlab.com/thedahv/jq-live
+    go get -u github.com/TheDahv/jq-live
 
 This pulls down the code, its dependencies, and installs a copy of `jq-live` in
 `$GOPATH/bin`.
@@ -94,7 +94,7 @@ mode:
 
     export GO111MODULE=on
 
-In either scenario, run `go get -u gitlab.com/thedahv/jq-live` to get package
+In either scenario, run `go get -u github.com/TheDahv/jq-live` to get package
 dependencies.
 
 ### JSON Processing

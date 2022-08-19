@@ -9,8 +9,8 @@ import (
 	"log"
 	"os"
 
-	"gitlab.com/thedahv/jq-live/json"
-	"gitlab.com/thedahv/jq-live/ui"
+	"github.com/TheDahv/jq-live/json"
+	"github.com/TheDahv/jq-live/ui"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module gitlab.com/thedahv/jq-live
+module github.com/TheDahv/jq-live
 
 require (
 	9fans.net/go v0.0.0-20180727211846-5d4fa602e1e8 // indirect
